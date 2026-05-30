@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, gte, lte, and, sql, desc } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, productsTable, categoriesTable } from "@workspace/db";
+import { Order, Product, Category } from "@workspace/db";
 import { GetSalesReportQueryParams } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/auth.js";
 
@@ -9,89 +8,112 @@ const router = Router();
 router.get("/reports/sales", requireAdmin, async (req, res): Promise<void> => {
   const qp = GetSalesReportQueryParams.safeParse(req.query);
 
-  const conditions = [eq(ordersTable.status, "completed" as any)];
+  const filter: any = { status: "completed" };
   if (qp.success) {
-    if (qp.data.from) conditions.push(gte(ordersTable.createdAt, new Date(qp.data.from)));
-    if (qp.data.to) conditions.push(lte(ordersTable.createdAt, new Date(qp.data.to)));
+    if (qp.data.from || qp.data.to) {
+      filter.createdAt = {};
+      if (qp.data.from) filter.createdAt.$gte = new Date(qp.data.from);
+      if (qp.data.to) filter.createdAt.$lte = new Date(qp.data.to);
+    }
   }
 
-  const [summary] = await db.select({
-    totalRevenue: sql<number>`coalesce(sum(${ordersTable.total}), 0)`,
-    totalOrders: sql<number>`cast(count(*) as int)`,
-    averageOrderValue: sql<number>`coalesce(avg(${ordersTable.total}), 0)`,
-  }).from(ordersTable).where(and(...conditions));
+  const orders: any = await Order.find(filter).lean();
 
-  const dailyData = await db.select({
-    date: sql<string>`to_char(date_trunc('day', ${ordersTable.createdAt}), 'YYYY-MM-DD')`,
-    revenue: sql<number>`coalesce(sum(${ordersTable.total}), 0)`,
-    orders: sql<number>`cast(count(*) as int)`,
-  })
-    .from(ordersTable)
-    .where(and(...conditions))
-    .groupBy(sql`date_trunc('day', ${ordersTable.createdAt})`)
-    .orderBy(sql`date_trunc('day', ${ordersTable.createdAt})`);
+  const totalRevenue = orders.reduce((sum: number, o: any) => sum + o.total, 0);
+  const totalOrders = orders.length;
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const dailyMap: Record<string, { revenue: number, orders: number }> = {};
+  orders.forEach((o: any) => {
+    const date = o.createdAt.toISOString().split('T')[0];
+    if (!dailyMap[date]) dailyMap[date] = { revenue: 0, orders: 0 };
+    dailyMap[date].revenue += o.total;
+    dailyMap[date].orders++;
+  });
+
+  const dailyData = Object.entries(dailyMap)
+    .map(([date, data]) => ({ date, revenue: Number(data.revenue.toFixed(2)), orders: data.orders }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   res.json({
-    totalRevenue: Number(summary.totalRevenue) || 0,
-    totalOrders: summary.totalOrders || 0,
-    averageOrderValue: Number(summary.averageOrderValue) || 0,
-    dailyData: dailyData.map(d => ({ date: d.date, revenue: Number(d.revenue), orders: d.orders })),
+    totalRevenue: Number(totalRevenue.toFixed(2)),
+    totalOrders,
+    averageOrderValue: Number(averageOrderValue.toFixed(2)),
+    dailyData,
   });
 });
 
 router.get("/reports/top-products", requireAdmin, async (req, res): Promise<void> => {
-  const rows = await db
-    .select({
-      productId: orderItemsTable.productId,
-      productName: orderItemsTable.productName,
-      productImageUrl: orderItemsTable.productImageUrl,
-      totalQuantity: sql<number>`cast(sum(${orderItemsTable.quantity}) as int)`,
-      totalRevenue: sql<number>`coalesce(sum(${orderItemsTable.subtotal}), 0)`,
-      categoryName: categoriesTable.name,
-    })
-    .from(orderItemsTable)
-    .innerJoin(ordersTable, eq(ordersTable.id, orderItemsTable.orderId))
-    .leftJoin(productsTable, eq(productsTable.id, orderItemsTable.productId))
-    .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-    .where(eq(ordersTable.status, "completed" as any))
-    .groupBy(orderItemsTable.productId, orderItemsTable.productName, orderItemsTable.productImageUrl, categoriesTable.name)
-    .orderBy(desc(sql`sum(${orderItemsTable.quantity})`))
-    .limit(10);
+  const completedOrders: any = await Order.find({ status: "completed" }).lean();
 
-  res.json(rows.map(r => ({
-    productId: r.productId,
-    productName: r.productName,
-    productImageUrl: r.productImageUrl ?? null,
-    totalQuantity: r.totalQuantity,
-    totalRevenue: Number(r.totalRevenue),
-    categoryName: r.categoryName ?? null,
-  })));
+  const productStats: Record<number, any> = {};
+  for (const order of completedOrders) {
+    for (const item of order.items) {
+      if (!productStats[item.productId]) {
+        productStats[item.productId] = {
+          productId: item.productId,
+          productName: item.productName,
+          productImageUrl: item.productImageUrl,
+          totalQuantity: 0,
+          totalRevenue: 0,
+        };
+      }
+      productStats[item.productId].totalQuantity += item.quantity;
+      productStats[item.productId].totalRevenue += item.subtotal;
+    }
+  }
+
+  const results = await Promise.all(Object.values(productStats).map(async (ps: any) => {
+    const product: any = await Product.findOne({ id: ps.productId }).lean();
+    const cat: any = product ? await Category.findOne({ id: product.categoryId }).lean() : null;
+    return {
+      ...ps,
+      totalRevenue: Number(ps.totalRevenue.toFixed(2)),
+      categoryName: cat?.name ?? null,
+    };
+  }));
+
+  res.json(results.sort((a, b) => b.totalQuantity - a.totalQuantity).slice(0, 10));
 });
 
 router.get("/reports/category-breakdown", requireAdmin, async (req, res): Promise<void> => {
-  const rows = await db
-    .select({
-      categoryId: categoriesTable.id,
-      categoryName: categoriesTable.name,
-      revenue: sql<number>`coalesce(sum(${orderItemsTable.subtotal}), 0)`,
-      orderCount: sql<number>`cast(count(distinct ${ordersTable.id}) as int)`,
-    })
-    .from(categoriesTable)
-    .leftJoin(productsTable, eq(productsTable.categoryId, categoriesTable.id))
-    .leftJoin(orderItemsTable, eq(orderItemsTable.productId, productsTable.id))
-    .leftJoin(ordersTable, and(eq(ordersTable.id, orderItemsTable.orderId), eq(ordersTable.status, "completed" as any)))
-    .groupBy(categoriesTable.id, categoriesTable.name)
-    .orderBy(desc(sql`sum(${orderItemsTable.subtotal})`));
+  const completedOrders: any = await Order.find({ status: "completed" }).lean();
+  const categories: any = await Category.find().lean();
 
-  const totalRevenue = rows.reduce((sum, r) => sum + Number(r.revenue), 0);
+  const categoryStats: Record<number, any> = {};
+  categories.forEach((c: any) => {
+    categoryStats[c.id] = {
+      categoryId: c.id,
+      categoryName: c.name,
+      revenue: 0,
+      orderCount: 0,
+      orderIds: new Set(),
+    };
+  });
 
-  res.json(rows.map(r => ({
-    categoryId: r.categoryId,
-    categoryName: r.categoryName,
-    revenue: Number(r.revenue),
-    orderCount: r.orderCount,
-    percentage: totalRevenue > 0 ? Number(((Number(r.revenue) / totalRevenue) * 100).toFixed(1)) : 0,
-  })));
+  for (const order of completedOrders) {
+    for (const item of order.items) {
+      const product: any = await Product.findOne({ id: item.productId }).lean();
+      if (product && categoryStats[product.categoryId]) {
+        categoryStats[product.categoryId].revenue += item.subtotal;
+        categoryStats[product.categoryId].orderIds.add(order.id);
+      }
+    }
+  }
+
+  const results = Object.values(categoryStats).map((cs: any) => ({
+    categoryId: cs.categoryId,
+    categoryName: cs.categoryName,
+    revenue: Number(cs.revenue.toFixed(2)),
+    orderCount: cs.orderIds.size,
+  }));
+
+  const totalRevenue = results.reduce((sum, r) => sum + r.revenue, 0);
+
+  res.json(results.map(r => ({
+    ...r,
+    percentage: totalRevenue > 0 ? Number(((r.revenue / totalRevenue) * 100).toFixed(1)) : 0,
+  })).sort((a, b) => b.revenue - a.revenue));
 });
 
 export default router;

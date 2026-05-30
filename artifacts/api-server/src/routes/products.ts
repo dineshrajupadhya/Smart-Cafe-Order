@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, and, ilike, sql } from "drizzle-orm";
-import { db, productsTable, categoriesTable } from "@workspace/db";
+import { Product, Category, getNextSequence } from "@workspace/db";
 import {
   CreateProductBody,
   UpdateProductBody,
@@ -15,7 +14,7 @@ import { requireAdmin } from "../middlewares/auth.js";
 
 const router = Router();
 
-function buildProductRow(p: typeof productsTable.$inferSelect, categoryName: string | null) {
+function buildProductRow(p: any, categoryName: string | null) {
   return {
     id: p.id,
     name: p.name,
@@ -31,7 +30,7 @@ function buildProductRow(p: typeof productsTable.$inferSelect, categoryName: str
     isVegetarian: p.isVegetarian,
     isSpicy: p.isSpicy,
     tags: p.tags,
-    createdAt: p.createdAt,
+    createdAt: p.createdAt.toISOString(),
   };
 }
 
@@ -43,35 +42,19 @@ router.get("/products", async (req, res): Promise<void> => {
   }
 
   const { categoryId, search, available } = qp.data;
-  const conditions = [];
-  if (categoryId !== undefined) conditions.push(eq(productsTable.categoryId, categoryId));
-  if (search) conditions.push(ilike(productsTable.name, `%${search}%`));
-  if (available !== undefined) conditions.push(eq(productsTable.isAvailable, available));
+  const filter: any = {};
+  if (categoryId !== undefined) filter.categoryId = categoryId;
+  if (search) filter.name = { $regex: search, $options: "i" };
+  if (available !== undefined) filter.isAvailable = available;
 
-  const rows = await db
-    .select({
-      id: productsTable.id,
-      name: productsTable.name,
-      description: productsTable.description,
-      price: productsTable.price,
-      imageUrl: productsTable.imageUrl,
-      categoryId: productsTable.categoryId,
-      categoryName: categoriesTable.name,
-      stock: productsTable.stock,
-      isAvailable: productsTable.isAvailable,
-      preparationTime: productsTable.preparationTime,
-      calories: productsTable.calories,
-      isVegetarian: productsTable.isVegetarian,
-      isSpicy: productsTable.isSpicy,
-      tags: productsTable.tags,
-      createdAt: productsTable.createdAt,
-    })
-    .from(productsTable)
-    .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(productsTable.name);
+  const products = await Product.find(filter).sort({ name: 1 }).lean();
 
-  res.json(rows);
+  const productsWithCat = await Promise.all(products.map(async (p: any) => {
+    const cat: any = await Category.findOne({ id: p.categoryId }).lean();
+    return buildProductRow(p, cat?.name ?? null);
+  }));
+
+  res.json(productsWithCat);
 });
 
 router.post("/products", requireAdmin, async (req, res): Promise<void> => {
@@ -80,16 +63,18 @@ router.post("/products", requireAdmin, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [p] = await db.insert(productsTable).values({
+  const id = await getNextSequence("product");
+  const p: any = await Product.create({
+    id,
     ...parsed.data,
     tags: parsed.data.tags ?? [],
     isVegetarian: parsed.data.isVegetarian ?? false,
     isSpicy: parsed.data.isSpicy ?? false,
     isAvailable: parsed.data.isAvailable ?? true,
     stock: parsed.data.stock ?? 0,
-  }).returning();
+  });
 
-  const [cat] = await db.select({ name: categoriesTable.name }).from(categoriesTable).where(eq(categoriesTable.id, p.categoryId));
+  const cat: any = await Category.findOne({ id: p.categoryId }).lean();
   res.status(201).json(buildProductRow(p, cat?.name ?? null));
 });
 
@@ -100,33 +85,13 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db
-    .select({
-      id: productsTable.id,
-      name: productsTable.name,
-      description: productsTable.description,
-      price: productsTable.price,
-      imageUrl: productsTable.imageUrl,
-      categoryId: productsTable.categoryId,
-      categoryName: categoriesTable.name,
-      stock: productsTable.stock,
-      isAvailable: productsTable.isAvailable,
-      preparationTime: productsTable.preparationTime,
-      calories: productsTable.calories,
-      isVegetarian: productsTable.isVegetarian,
-      isSpicy: productsTable.isSpicy,
-      tags: productsTable.tags,
-      createdAt: productsTable.createdAt,
-    })
-    .from(productsTable)
-    .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-    .where(eq(productsTable.id, params.data.id));
-
-  if (!row) {
+  const p: any = await Product.findOne({ id: params.data.id }).lean();
+  if (!p) {
     res.status(404).json({ error: "Product not found" });
     return;
   }
-  res.json(row);
+  const cat: any = await Category.findOne({ id: p.categoryId }).lean();
+  res.json(buildProductRow(p, cat?.name ?? null));
 });
 
 router.patch("/products/:id", requireAdmin, async (req, res): Promise<void> => {
@@ -140,12 +105,17 @@ router.patch("/products/:id", requireAdmin, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [p] = await db.update(productsTable).set(parsed.data).where(eq(productsTable.id, params.data.id)).returning();
+  const p: any = await Product.findOneAndUpdate(
+    { id: params.data.id },
+    { $set: parsed.data },
+    { new: true }
+  ).lean();
+
   if (!p) {
     res.status(404).json({ error: "Product not found" });
     return;
   }
-  const [cat] = await db.select({ name: categoriesTable.name }).from(categoriesTable).where(eq(categoriesTable.id, p.categoryId));
+  const cat: any = await Category.findOne({ id: p.categoryId }).lean();
   res.json(buildProductRow(p, cat?.name ?? null));
 });
 
@@ -155,7 +125,7 @@ router.delete("/products/:id", requireAdmin, async (req, res): Promise<void> => 
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  const [p] = await db.delete(productsTable).where(eq(productsTable.id, params.data.id)).returning();
+  const p = await Product.findOneAndDelete({ id: params.data.id });
   if (!p) {
     res.status(404).json({ error: "Product not found" });
     return;
@@ -174,15 +144,17 @@ router.patch("/products/:id/stock", requireAdmin, async (req, res): Promise<void
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [p] = await db.update(productsTable)
-    .set({ stock: parsed.data.stock, isAvailable: parsed.data.stock > 0 })
-    .where(eq(productsTable.id, params.data.id))
-    .returning();
+  const p: any = await Product.findOneAndUpdate(
+    { id: params.data.id },
+    { $set: { stock: parsed.data.stock, isAvailable: parsed.data.stock > 0 } },
+    { new: true }
+  ).lean();
+
   if (!p) {
     res.status(404).json({ error: "Product not found" });
     return;
   }
-  const [cat] = await db.select({ name: categoriesTable.name }).from(categoriesTable).where(eq(categoriesTable.id, p.categoryId));
+  const cat: any = await Category.findOne({ id: p.categoryId }).lean();
   res.json(buildProductRow(p, cat?.name ?? null));
 });
 
@@ -191,35 +163,26 @@ router.get("/qr/table/:tableNumber", async (req, res): Promise<void> => {
   const tableNumber = Array.isArray(req.params.tableNumber) ? req.params.tableNumber[0] : req.params.tableNumber;
 
   const [categories, products] = await Promise.all([
-    db.select().from(categoriesTable).orderBy(categoriesTable.name),
-    db
-      .select({
-        id: productsTable.id,
-        name: productsTable.name,
-        description: productsTable.description,
-        price: productsTable.price,
-        imageUrl: productsTable.imageUrl,
-        categoryId: productsTable.categoryId,
-        categoryName: categoriesTable.name,
-        stock: productsTable.stock,
-        isAvailable: productsTable.isAvailable,
-        preparationTime: productsTable.preparationTime,
-        calories: productsTable.calories,
-        isVegetarian: productsTable.isVegetarian,
-        isSpicy: productsTable.isSpicy,
-        tags: productsTable.tags,
-        createdAt: productsTable.createdAt,
-      })
-      .from(productsTable)
-      .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-      .where(eq(productsTable.isAvailable, true))
-      .orderBy(productsTable.name),
+    Category.find().sort({ name: 1 }).lean(),
+    Product.find({ isAvailable: true }).sort({ name: 1 }).lean(),
   ]);
+
+  const productsWithCat = await Promise.all(products.map(async (p: any) => {
+    const cat = categories.find((c: any) => c.id === p.categoryId);
+    return buildProductRow(p, cat?.name ?? null);
+  }));
 
   res.json({
     tableNumber,
-    categories: categories.map(c => ({ ...c, productCount: products.filter(p => p.categoryId === c.id).length })),
-    products,
+    categories: categories.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description ?? null,
+      imageUrl: c.imageUrl ?? null,
+      createdAt: c.createdAt.toISOString(),
+      productCount: products.filter((p: any) => p.categoryId === c.id).length,
+    })),
+    products: productsWithCat,
   });
 });
 

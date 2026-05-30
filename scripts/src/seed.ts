@@ -1,16 +1,20 @@
-import { db } from "@workspace/db";
-import { usersTable, categoriesTable, productsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { User, Category, Product, getNextSequence } from "@workspace/db";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 
 async function seed() {
-  console.log("Seeding database...");
+  console.log("Seeding MongoDB database...");
+
+  const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/cafeteria";
+  await mongoose.connect(mongoUri);
 
   // Seed admin user
-  const existing = await db.select().from(usersTable).where(eq(usersTable.email, "admin@cafeteria.com")).limit(1);
-  if (existing.length === 0) {
+  const existing = await User.findOne({ email: "admin@cafeteria.com" });
+  if (!existing) {
     const passwordHash = await bcrypt.hash("admin123", 10);
-    await db.insert(usersTable).values({
+    const id = await getNextSequence("user");
+    await User.create({
+      id,
       name: "Admin",
       email: "admin@cafeteria.com",
       passwordHash,
@@ -22,21 +26,27 @@ async function seed() {
   }
 
   // Seed categories
-  const existingCats = await db.select().from(categoriesTable);
-  if (existingCats.length === 0) {
-    const cats = await db.insert(categoriesTable).values([
+  const existingCats = await Category.countDocuments();
+  if (existingCats === 0) {
+    const catData = [
       { name: "Breakfast", description: "Start your day right", imageUrl: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&q=80" },
       { name: "Main Course", description: "Hearty meals to keep you going", imageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80" },
       { name: "Snacks", description: "Light bites and sides", imageUrl: "https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=400&q=80" },
       { name: "Beverages", description: "Hot and cold drinks", imageUrl: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80" },
       { name: "Desserts", description: "Sweet endings", imageUrl: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&q=80" },
-    ]).returning();
+    ];
+
+    const cats = [];
+    for (const data of catData) {
+        const id = await getNextSequence("category");
+        cats.push(await Category.create({ id, ...data }));
+    }
 
     const [breakfast, main, snacks, beverages, desserts] = cats;
     console.log("Created categories");
 
     // Seed products
-    await db.insert(productsTable).values([
+    const productData = [
       // Breakfast
       { name: "Masala Dosa", description: "Crispy rice crepe with spiced potato filling and chutney", price: 80, categoryId: breakfast.id, stock: 50, isVegetarian: true, preparationTime: 10, calories: 320, imageUrl: "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=400&q=80", tags: ["popular"] },
       { name: "Idli Sambar", description: "Steamed rice cakes with lentil soup and coconut chutney", price: 60, categoryId: breakfast.id, stock: 40, isVegetarian: true, preparationTime: 8, calories: 250, imageUrl: "https://images.unsplash.com/photo-1642821373181-696a54913e93?w=400&q=80", tags: [] },
@@ -68,13 +78,19 @@ async function seed() {
       { name: "Kulfi", description: "Traditional Indian ice cream with pistachios and saffron", price: 60, categoryId: desserts.id, stock: 25, isVegetarian: true, preparationTime: 1, calories: 200, imageUrl: "https://images.unsplash.com/photo-1557499305-0af888c3d8ec?w=400&q=80", tags: [] },
       { name: "Halwa", description: "Semolina pudding with ghee, sugar and dry fruits", price: 45, categoryId: desserts.id, stock: 30, isVegetarian: true, preparationTime: 5, calories: 350, imageUrl: "https://images.unsplash.com/photo-1548365328-8c6db3220e4d?w=400&q=80", tags: [] },
       { name: "Chocolate Brownie", description: "Warm fudgy brownie with vanilla ice cream", price: 90, categoryId: desserts.id, stock: 20, isVegetarian: true, preparationTime: 5, calories: 420, imageUrl: "https://images.unsplash.com/photo-1564355808539-22fda35bed7e?w=400&q=80", tags: ["bestseller"] },
-    ]);
+    ];
+
+    for (const data of productData) {
+        const id = await getNextSequence("product");
+        await Product.create({ id, ...data });
+    }
     console.log("Created products");
   } else {
-    console.log("Products already exist, skipping");
+    console.log("Categories/Products already exist, skipping");
   }
 
   console.log("Seeding complete!");
+  await mongoose.disconnect();
   process.exit(0);
 }
 

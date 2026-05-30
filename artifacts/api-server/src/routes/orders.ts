@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, cartItemsTable, productsTable, usersTable, paymentsTable } from "@workspace/db";
+import { Order, CartItem, Product, User, getNextSequence } from "@workspace/db";
 import {
   CreateOrderBody,
   UpdateOrderStatusBody,
@@ -14,36 +13,26 @@ import { requireAuth } from "../middlewares/auth.js";
 const router = Router();
 
 async function buildOrder(orderId: number) {
-  const [order] = await db.select({
-    id: ordersTable.id,
-    userId: ordersTable.userId,
-    userName: usersTable.name,
-    status: ordersTable.status,
-    total: ordersTable.total,
-    tableNumber: ordersTable.tableNumber,
-    notes: ordersTable.notes,
-    paymentMethod: ordersTable.paymentMethod,
-    paymentStatus: ordersTable.paymentStatus,
-    estimatedReadyTime: ordersTable.estimatedReadyTime,
-    createdAt: ordersTable.createdAt,
-    updatedAt: ordersTable.updatedAt,
-  })
-    .from(ordersTable)
-    .leftJoin(usersTable, eq(usersTable.id, ordersTable.userId))
-    .where(eq(ordersTable.id, orderId));
-
+  const order: any = await Order.findOne({ id: orderId }).lean();
   if (!order) return null;
 
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
+  const user: any = await User.findOne({ id: order.userId }).lean();
 
   return {
-    ...order,
-    userName: order.userName ?? null,
+    id: order.id,
+    userId: order.userId,
+    userName: user?.name ?? "Customer",
+    status: order.status,
+    total: order.total,
     tableNumber: order.tableNumber ?? null,
     notes: order.notes ?? null,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
     estimatedReadyTime: order.estimatedReadyTime ? order.estimatedReadyTime.toISOString() : null,
-    items: items.map(i => ({
-      id: i.id,
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+    items: order.items.map((i: any) => ({
+      id: i._id,
       productId: i.productId,
       productName: i.productName,
       productImageUrl: i.productImageUrl ?? null,
@@ -59,65 +48,41 @@ router.get("/orders", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
   const isAdmin = req.user!.role === "admin";
 
-  const conditions = [];
-  if (!isAdmin) conditions.push(eq(ordersTable.userId, userId));
-  if (qp.success && qp.data.status) {
-    conditions.push(eq(ordersTable.status, qp.data.status as any));
-  }
-  if (qp.success && qp.data.tableNumber) {
-    conditions.push(eq(ordersTable.tableNumber, qp.data.tableNumber));
-  }
+  const filter: any = {};
+  if (!isAdmin) filter.userId = userId;
+  if (qp.success && qp.data.status) filter.status = qp.data.status;
+  if (qp.success && qp.data.tableNumber) filter.tableNumber = qp.data.tableNumber;
 
-  const orders = await db
-    .select({
-      id: ordersTable.id,
-      userId: ordersTable.userId,
-      userName: usersTable.name,
-      status: ordersTable.status,
-      total: ordersTable.total,
-      tableNumber: ordersTable.tableNumber,
-      notes: ordersTable.notes,
-      paymentMethod: ordersTable.paymentMethod,
-      paymentStatus: ordersTable.paymentStatus,
-      estimatedReadyTime: ordersTable.estimatedReadyTime,
-      createdAt: ordersTable.createdAt,
-      updatedAt: ordersTable.updatedAt,
-    })
-    .from(ordersTable)
-    .leftJoin(usersTable, eq(usersTable.id, ordersTable.userId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(ordersTable.createdAt);
+  const orders = await Order.find(filter).sort({ createdAt: 1 }).lean();
 
-  // Fetch items for each order
-  const allItems = orders.length > 0
-    ? await db.select().from(orderItemsTable).where(
-        conditions.length > 0 || !isAdmin
-          ? eq(orderItemsTable.orderId, orders[0]?.id ?? 0)
-          : undefined
-      )
-    : [];
+  const results = await Promise.all(orders.map(async (o: any) => {
+    const user: any = await User.findOne({ id: o.userId }).lean();
+    return {
+      id: o.id,
+      userId: o.userId,
+      userName: user?.name ?? "Customer",
+      status: o.status,
+      total: o.total,
+      tableNumber: o.tableNumber ?? null,
+      notes: o.notes ?? null,
+      paymentMethod: o.paymentMethod,
+      paymentStatus: o.paymentStatus,
+      estimatedReadyTime: o.estimatedReadyTime ? o.estimatedReadyTime.toISOString() : null,
+      createdAt: o.createdAt.toISOString(),
+      updatedAt: o.updatedAt.toISOString(),
+      items: o.items.map((i: any) => ({
+        id: i._id,
+        productId: i.productId,
+        productName: i.productName,
+        productImageUrl: i.productImageUrl ?? null,
+        price: i.price,
+        quantity: i.quantity,
+        subtotal: i.subtotal,
+      })),
+    };
+  }));
 
-  const orderIds = orders.map(o => o.id);
-  const items = orderIds.length > 0
-    ? await db.select().from(orderItemsTable)
-    : [];
-
-  res.json(orders.map(o => ({
-    ...o,
-    userName: o.userName ?? null,
-    tableNumber: o.tableNumber ?? null,
-    notes: o.notes ?? null,
-    estimatedReadyTime: o.estimatedReadyTime ? o.estimatedReadyTime.toISOString() : null,
-    items: items.filter(i => i.orderId === o.id).map(i => ({
-      id: i.id,
-      productId: i.productId,
-      productName: i.productName,
-      productImageUrl: i.productImageUrl ?? null,
-      price: i.price,
-      quantity: i.quantity,
-      subtotal: i.subtotal,
-    })),
-  })));
+  res.json(results);
 });
 
 router.post("/orders", requireAuth, async (req, res): Promise<void> => {
@@ -131,28 +96,31 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
   const { tableNumber, notes, paymentMethod } = parsed.data;
 
   // Get cart items
-  const cartItems = await db
-    .select({
-      id: cartItemsTable.id,
-      productId: cartItemsTable.productId,
-      quantity: cartItemsTable.quantity,
-      productName: productsTable.name,
-      productImageUrl: productsTable.imageUrl,
-      price: productsTable.price,
-      stock: productsTable.stock,
-    })
-    .from(cartItemsTable)
-    .innerJoin(productsTable, eq(productsTable.id, cartItemsTable.productId))
-    .where(eq(cartItemsTable.userId, userId));
-
+  const cartItems: any = await CartItem.find({ userId }).lean();
   if (cartItems.length === 0) {
     res.status(400).json({ error: "Cart is empty" });
     return;
   }
 
-  const total = Number(cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2));
+  const orderItems = await Promise.all(cartItems.map(async (i: any) => {
+    const product: any = await Product.findOne({ id: i.productId }).lean();
+    if (!product) throw new Error(`Product ${i.productId} not found`);
+    return {
+      productId: i.productId,
+      productName: product.name,
+      productImageUrl: product.imageUrl ?? null,
+      price: product.price,
+      quantity: i.quantity,
+      subtotal: Number((product.price * i.quantity).toFixed(2)),
+    };
+  }));
 
-  const [order] = await db.insert(ordersTable).values({
+  const subtotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0);
+  const total = Number((subtotal * 1.05).toFixed(2));
+
+  const id = await getNextSequence("order");
+  const order: any = await Order.create({
+    id,
     userId,
     total,
     tableNumber: tableNumber ?? null,
@@ -161,20 +129,11 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
     paymentStatus: "pending",
     status: "pending",
     estimatedReadyTime: new Date(Date.now() + 20 * 60 * 1000), // 20 mins
-  }).returning();
-
-  await db.insert(orderItemsTable).values(cartItems.map(i => ({
-    orderId: order.id,
-    productId: i.productId,
-    productName: i.productName,
-    productImageUrl: i.productImageUrl ?? null,
-    price: i.price,
-    quantity: i.quantity,
-    subtotal: Number((i.price * i.quantity).toFixed(2)),
-  })));
+    items: orderItems,
+  });
 
   // Clear cart
-  await db.delete(cartItemsTable).where(eq(cartItemsTable.userId, userId));
+  await CartItem.deleteMany({ userId });
 
   const result = await buildOrder(order.id);
   res.status(201).json(result);
@@ -215,7 +174,7 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
     return;
   }
 
-  const updates: Record<string, any> = {
+  const updates: any = {
     status: parsed.data.status,
     updatedAt: new Date(),
   };
@@ -223,7 +182,11 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
     updates.paymentStatus = "paid";
   }
 
-  const [order] = await db.update(ordersTable).set(updates).where(eq(ordersTable.id, params.data.id)).returning();
+  const order: any = await Order.findOneAndUpdate(
+    { id: params.data.id },
+    { $set: updates },
+    { new: true }
+  );
   if (!order) {
     res.status(404).json({ error: "Order not found" });
     return;
@@ -239,10 +202,11 @@ router.post("/orders/:id/cancel", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
-  const [order] = await db.update(ordersTable)
-    .set({ status: "cancelled", updatedAt: new Date() })
-    .where(eq(ordersTable.id, params.data.id))
-    .returning();
+  const order: any = await Order.findOneAndUpdate(
+    { id: params.data.id },
+    { $set: { status: "cancelled", updatedAt: new Date() } },
+    { new: true }
+  );
 
   if (!order) {
     res.status(404).json({ error: "Order not found" });

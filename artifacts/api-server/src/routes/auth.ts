@@ -1,7 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { User, getNextSequence } from "@workspace/db";
 import { RegisterBody, LoginBody, GetMeResponse } from "@workspace/api-zod";
 import { requireAuth, signToken } from "../middlewares/auth.js";
 
@@ -16,19 +15,21 @@ router.post("/auth/register", async (req, res): Promise<void> => {
 
   const { name, email, password, role } = parsed.data;
 
-  const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-  if (existing.length > 0) {
+  const existing = await User.findOne({ email });
+  if (existing) {
     res.status(400).json({ error: "Email already in use" });
     return;
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const [user] = await db.insert(usersTable).values({
+  const id = await getNextSequence("user");
+  const user = await User.create({
+    id,
     name,
     email,
     passwordHash,
     role: (role as "customer" | "admin") ?? "customer",
-  }).returning();
+  });
 
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
   res.status(201).json({
@@ -52,7 +53,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   const { email, password } = parsed.data;
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  const user: any = await User.findOne({ email });
   if (!user) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
@@ -78,7 +79,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 });
 
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId)).limit(1);
+  const user: any = await User.findOne({ id: req.user!.userId });
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;

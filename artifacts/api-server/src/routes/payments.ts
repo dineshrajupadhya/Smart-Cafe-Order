@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
-import { db, paymentsTable, ordersTable } from "@workspace/db";
+import { Payment, Order, getNextSequence } from "@workspace/db";
 import { InitiatePaymentBody, ConfirmPaymentBody, ConfirmPaymentParams, GetPaymentByOrderParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth.js";
 
@@ -15,19 +14,21 @@ router.post("/payments/initiate", requireAuth, async (req, res): Promise<void> =
 
   const { orderId, method, upiId } = parsed.data;
 
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+  const order: any = await Order.findOne({ id: orderId }).lean();
   if (!order) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
 
-  const [payment] = await db.insert(paymentsTable).values({
+  const id = await getNextSequence("payment");
+  const payment: any = await Payment.create({
+    id,
     orderId,
     method: method as any,
     status: "pending",
     amount: order.total,
     upiId: upiId ?? null,
-  }).returning();
+  });
 
   res.json({
     id: payment.id,
@@ -37,7 +38,7 @@ router.post("/payments/initiate", requireAuth, async (req, res): Promise<void> =
     amount: payment.amount,
     transactionId: payment.transactionId ?? null,
     upiId: payment.upiId ?? null,
-    createdAt: payment.createdAt,
+    createdAt: payment.createdAt.toISOString(),
   });
 });
 
@@ -53,10 +54,11 @@ router.post("/payments/:id/confirm", requireAuth, async (req, res): Promise<void
     return;
   }
 
-  const [payment] = await db.update(paymentsTable)
-    .set({ status: "paid", transactionId: parsed.data.transactionId })
-    .where(eq(paymentsTable.id, params.data.id))
-    .returning();
+  const payment: any = await Payment.findOneAndUpdate(
+    { id: params.data.id },
+    { $set: { status: "paid", transactionId: parsed.data.transactionId } },
+    { new: true }
+  ).lean();
 
   if (!payment) {
     res.status(404).json({ error: "Payment not found" });
@@ -64,9 +66,10 @@ router.post("/payments/:id/confirm", requireAuth, async (req, res): Promise<void
   }
 
   // Update order payment status
-  await db.update(ordersTable)
-    .set({ paymentStatus: "paid", status: "confirmed", updatedAt: new Date() })
-    .where(eq(ordersTable.id, payment.orderId));
+  await Order.updateOne(
+    { id: payment.orderId },
+    { $set: { paymentStatus: "paid", status: "confirmed", updatedAt: new Date() } }
+  );
 
   res.json({
     id: payment.id,
@@ -76,7 +79,7 @@ router.post("/payments/:id/confirm", requireAuth, async (req, res): Promise<void
     amount: payment.amount,
     transactionId: payment.transactionId ?? null,
     upiId: payment.upiId ?? null,
-    createdAt: payment.createdAt,
+    createdAt: payment.createdAt.toISOString(),
   });
 });
 
@@ -87,10 +90,9 @@ router.get("/payments/order/:orderId", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [payment] = await db.select().from(paymentsTable)
-    .where(eq(paymentsTable.orderId, params.data.orderId))
-    .orderBy(paymentsTable.createdAt)
-    .limit(1);
+  const payment: any = await Payment.findOne({ orderId: params.data.orderId })
+    .sort({ createdAt: 1 })
+    .lean();
 
   if (!payment) {
     res.status(404).json({ error: "Payment not found" });
@@ -105,7 +107,7 @@ router.get("/payments/order/:orderId", requireAuth, async (req, res): Promise<vo
     amount: payment.amount,
     transactionId: payment.transactionId ?? null,
     upiId: payment.upiId ?? null,
-    createdAt: payment.createdAt,
+    createdAt: payment.createdAt.toISOString(),
   });
 });
 
