@@ -11,9 +11,7 @@
   "dependencies": {
     "@workspace/db": "workspace:*",
     "bcryptjs": "^3.0.3",
-    "drizzle-orm": "catalog:",
-    "mongoose": "^8.9.0",
-    "pg": "^8.20.0"
+    "mongoose": "^8.9.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
