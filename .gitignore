@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+build/
+dist/
+.DS_Store
+*.log
+backend/node_modules/
+frontend/node_modules/
+Smart-Cafe-Order-main/
