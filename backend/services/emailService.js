@@ -1,3 +1,4 @@
+// Resend email API - sends via HTTPS (works on Render free tier)
 const { Resend } = require('resend');
 
 const sendEmail = async ({ to, subject, html }) => {
@@ -9,18 +10,17 @@ const sendEmail = async ({ to, subject, html }) => {
 
   try {
     const resend = new Resend(apiKey);
-    const fromEmail = 'onboarding@resend.dev';
-    const fromName = 'Smart Cafe';
+    const fromAddress = 'Smart Cafe <onboarding@resend.dev>';
 
     const { data, error } = await resend.emails.send({
-      from: `${fromName} <${fromEmail}>`,
+      from: fromAddress,
       to: [to],
       subject,
       html
     });
 
     if (error) {
-      console.error('Email error:', error.message);
+      console.error('Resend error:', error.message);
       return { success: false, error: error.message };
     }
 
