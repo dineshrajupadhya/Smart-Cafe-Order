@@ -68,6 +68,31 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Smart Cafeteria API is running' });
 });
 
+app.get('/api/test-email', async (req, res) => {
+  const nodemailer = require('nodemailer');
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+    await transporter.verify();
+    const info = await transporter.sendMail({
+      from: `"Smart Cafe" <${process.env.SMTP_USER}>`,
+      to: process.env.SMTP_USER,
+      subject: 'Smart Cafe - Test Email',
+      html: '<h1>It works!</h1><p>If you see this, email is configured correctly.</p>'
+    });
+    res.json({ success: true, messageId: info.messageId, smtpUser: process.env.SMTP_USER ? 'set' : 'missing', smtpPass: process.env.SMTP_PASS ? 'set' : 'missing' });
+  } catch (err) {
+    res.json({ success: false, error: err.message, smtpUser: process.env.SMTP_USER ? 'set' : 'missing', smtpPass: process.env.SMTP_PASS ? 'set' : 'missing' });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ success: false, message: 'Server Error', error: err.message });
