@@ -185,16 +185,11 @@ exports.processPayment = async (req, res, next) => {
         </html>
       `;
 
-      try {
-        await sendEmail({
-          to: populatedOrder.user.email,
-          subject: `Order Confirmed #${order.orderNumber} - Smart Cafe`,
-          html: emailHtml
-        });
-        console.log(`Order confirmation email sent to ${populatedOrder.user.email}`);
-      } catch (emailErr) {
-        console.error('Failed to send order email:', emailErr.message);
-      }
+      sendEmail({
+        to: populatedOrder.user.email,
+        subject: `Order Confirmed #${order.orderNumber} - Smart Cafe`,
+        html: emailHtml
+      }).catch(emailErr => console.error('Failed to send order email:', emailErr.message));
     }
 
     res.json({ success: true, payment });

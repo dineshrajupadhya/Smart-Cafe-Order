@@ -174,19 +174,19 @@ exports.createOrder = async (req, res, next) => {
         </html>
       `;
 
-      await sendEmail({
+      sendEmail({
         to: populatedOrder.user.email,
         subject: `Order Placed #${order.orderNumber} - Smart Cafe`,
         html: emailHtml
-      });
+      }).catch(e => console.log('Order email failed:', e.message));
 
-      await Notification.create({
+      Notification.create({
         user: req.user.id,
         type: 'order-status',
         title: 'Order Placed',
         message: `Your order ${order.orderNumber} has been placed successfully`,
         data: { orderId: order._id.toString() }
-      });
+      }).catch(e => console.log('Notification failed:', e.message));
     } catch (e) {
       console.log('Notification failed:', e.message);
     }
