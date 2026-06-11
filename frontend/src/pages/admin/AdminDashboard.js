@@ -40,8 +40,8 @@ const AdminDashboard = () => {
     { label: 'Total Users', value: stats.totalUsers, icon: FiUsers, color: 'bg-blue-500', link: '/admin/users' },
     { label: 'Products', value: stats.activeProducts, icon: FiPackage, color: 'bg-green-500', link: '/admin/products' },
     { label: 'Total Orders', value: stats.totalOrders, icon: FiShoppingBag, color: 'bg-purple-500', link: '/admin/orders' },
-    { label: 'Revenue', value: `₹${stats.totalRevenue.toFixed(0)}`, icon: FiDollarSign, color: 'bg-yellow-500' },
-    { label: "Today's Orders", value: stats.todayOrders, icon: FiTrendingUp, color: 'bg-pink-500' },
+    { label: 'Revenue', value: `₹${stats.totalRevenue.toFixed(0)}`, icon: FiDollarSign, color: 'bg-yellow-500', link: '/admin/reports' },
+    { label: "Today's Orders", value: stats.todayOrders, icon: FiTrendingUp, color: 'bg-pink-500', link: '/admin/orders' },
     { label: 'Pending Orders', value: stats.pendingOrders, icon: FiClock, color: 'bg-orange-500', link: '/admin/orders' }
   ];
 
@@ -75,8 +75,8 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
-          return (
-            <Link key={index} to={stat.link || '#'} className="card p-6 hover:shadow-lg transition-shadow">
+          const CardContent = (
+            <div className="card p-6 hover:shadow-lg transition-shadow">
               <div className="flex items-center gap-4">
                 <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
                   <Icon size={24} className="text-white" />
@@ -86,7 +86,12 @@ const AdminDashboard = () => {
                   <p className="text-2xl font-bold text-dark-800">{stat.value}</p>
                 </div>
               </div>
-            </Link>
+            </div>
+          );
+          return stat.link ? (
+            <Link key={index} to={stat.link}>{CardContent}</Link>
+          ) : (
+            <div key={index}>{CardContent}</div>
           );
         })}
       </div>

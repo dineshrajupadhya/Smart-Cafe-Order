@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 
 const CustomerLayout = () => {
@@ -24,9 +24,9 @@ const CustomerLayout = () => {
             <div>
               <h3 className="font-semibold mb-4">Quick Links</h3>
               <ul className="space-y-2 text-dark-300 text-sm">
-                <li><a href="/menu" className="hover:text-primary-400">Menu</a></li>
-                <li><a href="/orders" className="hover:text-primary-400">My Orders</a></li>
-                <li><a href="/profile" className="hover:text-primary-400">Profile</a></li>
+                <li><Link to="/menu" className="hover:text-primary-400">Menu</Link></li>
+                <li><Link to="/orders" className="hover:text-primary-400">My Orders</Link></li>
+                <li><Link to="/profile" className="hover:text-primary-400">Profile</Link></li>
               </ul>
             </div>
             <div>
