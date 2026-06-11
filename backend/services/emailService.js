@@ -3,9 +3,7 @@ const nodemailer = require('nodemailer');
 const sendEmail = async ({ to, subject, html }) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: true,
+      service: 'gmail',
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -15,7 +13,7 @@ const sendEmail = async ({ to, subject, html }) => {
     });
 
     const mailOptions = {
-      from: `"${process.env.FROM_NAME || 'Smart Cafe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@smartcafe.com'}>`,
+      from: `"${process.env.FROM_NAME || 'Smart Cafe'}" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html

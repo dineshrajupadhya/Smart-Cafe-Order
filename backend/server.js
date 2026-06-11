@@ -74,9 +74,7 @@ app.get('/api/test-email', async (req, res) => {
   const smtpPass = process.env.SMTP_PASS ? `${process.env.SMTP_PASS.substring(0,2)}***${process.env.SMTP_PASS.substring(process.env.SMTP_PASS.length - 2)} (len:${process.env.SMTP_PASS.length})` : 'NOT SET';
   try {
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: true,
+      service: 'gmail',
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
