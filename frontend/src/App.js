@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { SocketProvider } from './context/SocketContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
@@ -47,41 +48,43 @@ const GuestRoute = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <SocketProvider>
-          <Router>
-            <Toaster position="top-right" />
-            <Routes>
-              <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-              <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
-              <Route path="/scan" element={<QRScan />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <CartProvider>
+          <SocketProvider>
+            <Router>
+              <Toaster position="top-right" />
+              <Routes>
+                <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+                <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
+                <Route path="/scan" element={<QRScan />} />
 
-              <Route path="/" element={<PrivateRoute><PageTransition><CustomerLayout /></PageTransition></PrivateRoute>}>
-                <Route index element={<Home />} />
-                <Route path="menu" element={<Menu />} />
-                <Route path="cart" element={<Cart />} />
-                <Route path="checkout" element={<Checkout />} />
-                <Route path="orders" element={<MyOrders />} />
-                <Route path="track/:orderNumber" element={<OrderTracking />} />
-                <Route path="profile" element={<Profile />} />
-              </Route>
+                <Route path="/" element={<PrivateRoute><CustomerLayout /></PrivateRoute>}>
+                  <Route index element={<PageTransition><Home /></PageTransition>} />
+                  <Route path="menu" element={<PageTransition><Menu /></PageTransition>} />
+                  <Route path="cart" element={<PageTransition><Cart /></PageTransition>} />
+                  <Route path="checkout" element={<PageTransition><Checkout /></PageTransition>} />
+                  <Route path="orders" element={<PageTransition><MyOrders /></PageTransition>} />
+                  <Route path="track/:orderNumber" element={<PageTransition><OrderTracking /></PageTransition>} />
+                  <Route path="profile" element={<PageTransition><Profile /></PageTransition>} />
+                </Route>
 
-              <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-                <Route index element={<AdminDashboard />} />
-                <Route path="products" element={<AdminProducts />} />
-                <Route path="orders" element={<AdminOrders />} />
-                <Route path="stock" element={<AdminStock />} />
-                <Route path="users" element={<AdminUsers />} />
-                <Route path="coupons" element={<AdminCoupons />} />
-                <Route path="qr" element={<AdminQR />} />
-                <Route path="reports" element={<AdminReports />} />
-              </Route>
-            </Routes>
-          </Router>
-        </SocketProvider>
-      </CartProvider>
-    </AuthProvider>
+                <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="products" element={<AdminProducts />} />
+                  <Route path="orders" element={<AdminOrders />} />
+                  <Route path="stock" element={<AdminStock />} />
+                  <Route path="users" element={<AdminUsers />} />
+                  <Route path="coupons" element={<AdminCoupons />} />
+                  <Route path="qr" element={<AdminQR />} />
+                  <Route path="reports" element={<AdminReports />} />
+                </Route>
+              </Routes>
+            </Router>
+          </SocketProvider>
+        </CartProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

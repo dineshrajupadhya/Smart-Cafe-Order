@@ -23,6 +23,7 @@ const Home = () => {
   const [popularItems, setPopularItems] = useState([]);
   const [trendingItems, setTrendingItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,8 +36,13 @@ const Home = () => {
         if (results[0].status === 'fulfilled') setCategories(results[0].value.data.categories || []);
         if (results[1].status === 'fulfilled') setPopularItems(results[1].value.data.popular || []);
         if (results[2].status === 'fulfilled') setTrendingItems(results[2].value.data.trending || []);
+        const anyFailed = results.some(r => r.status === 'rejected');
+        if (anyFailed && results.every(r => r.status === 'rejected')) {
+          setError('Failed to load data. Please try again.');
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -52,6 +58,21 @@ const Home = () => {
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           className="rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"
         />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center px-4">
+        <div className="text-5xl mb-4">😕</div>
+        <h2 className="text-xl font-bold text-dark-800 mb-2">{error}</h2>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
