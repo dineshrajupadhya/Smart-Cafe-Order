@@ -70,6 +70,8 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/test-email', async (req, res) => {
   const nodemailer = require('nodemailer');
+  const smtpUser = process.env.SMTP_USER || 'NOT SET';
+  const smtpPass = process.env.SMTP_PASS ? `${process.env.SMTP_PASS.substring(0,2)}***${process.env.SMTP_PASS.substring(process.env.SMTP_PASS.length - 2)} (len:${process.env.SMTP_PASS.length})` : 'NOT SET';
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -78,18 +80,19 @@ app.get('/api/test-email', async (req, res) => {
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-      }
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000
     });
-    await transporter.verify();
     const info = await transporter.sendMail({
       from: `"Smart Cafe" <${process.env.SMTP_USER}>`,
       to: process.env.SMTP_USER,
       subject: 'Smart Cafe - Test Email',
-      html: '<h1>It works!</h1><p>If you see this, email is configured correctly.</p>'
+      html: '<h1>It works!</h1><p>Email configured correctly.</p>'
     });
-    res.json({ success: true, messageId: info.messageId, smtpUser: process.env.SMTP_USER ? 'set' : 'missing', smtpPass: process.env.SMTP_PASS ? 'set' : 'missing' });
+    res.json({ success: true, messageId: info.messageId, smtpUser, smtpPass });
   } catch (err) {
-    res.json({ success: false, error: err.message, smtpUser: process.env.SMTP_USER ? 'set' : 'missing', smtpPass: process.env.SMTP_PASS ? 'set' : 'missing' });
+    res.json({ success: false, error: err.message, smtpUser, smtpPass });
   }
 });
 
