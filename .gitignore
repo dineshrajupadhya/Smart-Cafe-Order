@@ -8,3 +8,6 @@ dist/
 backend/node_modules/
 frontend/node_modules/
 Smart-Cafe-Order-main/
+
+# Local Netlify folder
+.netlify

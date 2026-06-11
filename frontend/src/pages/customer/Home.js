@@ -27,14 +27,14 @@ const Home = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [catRes, popRes, trendRes] = await Promise.all([
+        const results = await Promise.allSettled([
           api.get('/categories'),
           api.get('/recommendations/popular'),
           api.get('/recommendations/trending')
         ]);
-        setCategories(catRes.data.categories);
-        setPopularItems(popRes.data.popular);
-        setTrendingItems(trendRes.data.trending);
+        if (results[0].status === 'fulfilled') setCategories(results[0].value.data.categories || []);
+        if (results[1].status === 'fulfilled') setPopularItems(results[1].value.data.popular || []);
+        if (results[2].status === 'fulfilled') setTrendingItems(results[2].value.data.trending || []);
       } catch (err) {
         console.error('Error fetching data:', err);
       } finally {

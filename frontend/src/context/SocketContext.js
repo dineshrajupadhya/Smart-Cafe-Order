@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
@@ -6,37 +6,43 @@ import toast from 'react-hot-toast';
 const SocketContext = createContext();
 
 export const useSocket = () => {
-  const context = useContext(SocketContext);
-  if (!context) throw new Error('useSocket must be used within SocketProvider');
-  return context;
+  return useContext(SocketContext) || { socket: null, joinOrderRoom: () => {} };
 };
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const { user } = useAuth();
+  const userRef = useRef(user);
+  userRef.current = user;
 
   useEffect(() => {
     const newSocket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000', {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 10000
     });
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
-      if (user?.role === 'admin') {
+      if (userRef.current?.role === 'admin') {
         newSocket.emit('join-admin');
       }
     });
 
     newSocket.on('new-order', (order) => {
-      if (user?.role === 'admin') {
+      if (userRef.current?.role === 'admin') {
         toast.success(`New order: ${order.orderNumber}`);
       }
     });
 
+    newSocket.on('connect_error', () => {});
+
     setSocket(newSocket);
 
     return () => newSocket.disconnect();
-  }, [user]);
+  }, []);
 
   const joinOrderRoom = (orderId) => {
     if (socket) socket.emit('join-order', orderId);
