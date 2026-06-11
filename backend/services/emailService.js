@@ -9,8 +9,8 @@ const sendEmail = async ({ to, subject, html }) => {
 
   try {
     const resend = new Resend(apiKey);
-    const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
-    const fromName = process.env.FROM_NAME || 'Smart Cafe';
+    const fromEmail = 'onboarding@resend.dev';
+    const fromName = 'Smart Cafe';
 
     const { data, error } = await resend.emails.send({
       from: `${fromName} <${fromEmail}>`,
