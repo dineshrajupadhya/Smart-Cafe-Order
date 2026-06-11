@@ -1,27 +1,31 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const sendEmail = async ({ to, subject, html }) => {
-  try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      },
-      connectionTimeout: 15000,
-      greetingTimeout: 10000
-    });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('Email skipped: RESEND_API_KEY not set');
+    return { success: false, error: 'RESEND_API_KEY not configured' };
+  }
 
-    const mailOptions = {
-      from: `"${process.env.FROM_NAME || 'Smart Cafe'}" <${process.env.SMTP_USER}>`,
-      to,
+  try {
+    const resend = new Resend(apiKey);
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev';
+    const fromName = process.env.FROM_NAME || 'Smart Cafe';
+
+    const { data, error } = await resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: [to],
       subject,
       html
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    if (error) {
+      console.error('Email error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log('Email sent:', data?.id);
+    return { success: true, messageId: data?.id };
   } catch (error) {
     console.error('Email error:', error.message);
     return { success: false, error: error.message };
