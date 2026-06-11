@@ -13,11 +13,11 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: EMAIL_HOST
+      - key: SMTP_HOST
         sync: false
-      - key: EMAIL_PORT
+      - key: SMTP_PORT
         sync: false
-      - key: EMAIL_USER
+      - key: SMTP_USER
         sync: false
-      - key: EMAIL_PASS
+      - key: SMTP_PASS
         sync: false
