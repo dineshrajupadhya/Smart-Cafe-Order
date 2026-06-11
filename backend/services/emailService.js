@@ -9,7 +9,7 @@ const sendEmail = async ({ to, subject, html }) => {
 
   try {
     const resend = new Resend(apiKey);
-    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev';
+    const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const fromName = process.env.FROM_NAME || 'Smart Cafe';
 
     const { data, error } = await resend.emails.send({
