@@ -13,7 +13,7 @@ const sendEmail = async ({ to, subject, html }) => {
     });
 
     const mailOptions = {
-      from: `"${process.env.FROM_NAME || 'Smart Cafe'}" <${process.env.FROM_EMAIL || 'noreply@smartcafe.com'}>`,
+      from: `"${process.env.FROM_NAME || 'Smart Cafe'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@smartcafe.com'}>`,
       to,
       subject,
       html
