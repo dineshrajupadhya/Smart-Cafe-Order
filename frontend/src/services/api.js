@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://smart-cafe-order-backend.onrender.com/api'
+  baseURL: process.env.REACT_APP_API_URL || 'https://smart-cafe-backend-2ibh.onrender.com/api'
 });
 
 api.interceptors.request.use((config) => {
