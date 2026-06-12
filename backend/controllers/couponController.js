@@ -47,13 +47,27 @@ exports.deleteCoupon = async (req, res, next) => {
 
 exports.getActiveCoupons = async (req, res, next) => {
   try {
+    const now = new Date();
     const coupons = await Coupon.find({
       isActive: true,
-      startDate: { $lte: new Date() },
-      $or: [{ endDate: { $gte: new Date() } }, { endDate: null }]
+      $and: [
+        {
+          $or: [
+            { startDate: { $lte: now } },
+            { startDate: null },
+            { startDate: { $exists: false } }
+          ]
+        },
+        {
+          $or: [
+            { endDate: { $gte: now } },
+            { endDate: null },
+            { endDate: { $exists: false } }
+          ]
+        }
+      ]
     }).select('code description discountType discountValue minOrderAmount maxDiscountAmount usageLimit usedCount endDate');
 
-    const now = new Date();
     const active = coupons.filter(c => {
       if (c.usageLimit && c.usedCount >= c.usageLimit) return false;
       return true;
