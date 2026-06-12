@@ -45,6 +45,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/recommendations', require('./routes/recommendations'));
 app.use('/api/qr', require('./routes/qr'));
+app.use('/api/coupons', require('./routes/coupons'));
 
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);

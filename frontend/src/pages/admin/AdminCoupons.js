@@ -194,13 +194,17 @@ const AdminCoupons = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-dark-700 mb-1">Usage Limit</label>
-                  <input type="number" value={formData.usageLimit} onChange={(e) => setFormData({...formData, usageLimit: e.target.value})} className="input-field" min="0" />
+                  <label className="block text-sm font-medium text-dark-700 mb-1">Start Date</label>
+                  <input type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} className="input-field" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-dark-700 mb-1">End Date</label>
                   <input type="date" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} className="input-field" />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Usage Limit</label>
+                <input type="number" value={formData.usageLimit} onChange={(e) => setFormData({...formData, usageLimit: e.target.value})} className="input-field" min="0" placeholder="Leave empty for unlimited" />
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-outline">Cancel</button>

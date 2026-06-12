@@ -7,6 +7,7 @@ const AdminStock = () => {
   const [products, setProducts] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stockValues, setStockValues] = useState({});
 
   useEffect(() => {
     fetchProducts();
@@ -69,21 +70,32 @@ const AdminStock = () => {
             <h2 className="text-lg font-semibold">Low Stock Alert ({lowStockProducts.length} items)</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {lowStockProducts.map(product => (
-              <div key={product._id} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-dark-800">{product.name}</p>
-                  <p className="text-sm text-yellow-600">Stock: {product.stock}</p>
+            {lowStockProducts.map(product => {
+              const lowVal = stockValues[product._id] !== undefined ? stockValues[product._id] : product.stock;
+              return (
+                <div key={product._id} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-dark-800">{product.name}</p>
+                    <p className="text-sm text-yellow-600">Stock: {product.stock}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={lowVal}
+                      onChange={(e) => setStockValues({...stockValues, [product._id]: e.target.value})}
+                      className="w-20 px-2 py-1 border rounded text-sm"
+                      min="0"
+                    />
+                    <button
+                      onClick={() => updateStock(product._id, lowVal)}
+                      className="p-1 text-green-500 hover:text-green-600"
+                    >
+                      <FiCheck size={14} />
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type="number"
-                  defaultValue={product.stock}
-                  onBlur={(e) => updateStock(product._id, e.target.value)}
-                  className="w-20 px-2 py-1 border rounded text-sm"
-                  min="0"
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -104,6 +116,7 @@ const AdminStock = () => {
             <tbody>
               {products.map(product => {
                 const status = getStockStatus(product);
+                const currentVal = stockValues[product._id] !== undefined ? stockValues[product._id] : product.stock;
                 return (
                   <tr key={product._id} className="border-t hover:bg-dark-50">
                     <td className="py-3 px-4">
@@ -122,16 +135,13 @@ const AdminStock = () => {
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
-                          defaultValue={product.stock}
-                          onBlur={(e) => updateStock(product._id, e.target.value)}
+                          value={currentVal}
+                          onChange={(e) => setStockValues({...stockValues, [product._id]: e.target.value})}
                           className="w-20 px-2 py-1 border rounded text-sm"
                           min="0"
                         />
                         <button
-                          onClick={(e) => {
-                            const input = e.target.parentElement.querySelector('input');
-                            updateStock(product._id, input.value);
-                          }}
+                          onClick={() => updateStock(product._id, currentVal)}
                           className="p-1 text-green-500 hover:text-green-600"
                         >
                           <FiCheck size={16} />
