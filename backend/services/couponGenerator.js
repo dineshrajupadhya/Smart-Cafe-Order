@@ -49,38 +49,35 @@ async function generateWeeklyCoupons() {
   try {
     console.log('[Coupon Generator] Starting weekly coupon generation...');
 
+    await Coupon.updateMany({ isActive: true }, { isActive: false });
+    console.log('[Coupon Generator] Deactivated previous active coupon');
+
     const now = new Date();
     const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const generated = [];
+    const template = COUPON_TEMPLATES[Math.floor(Math.random() * COUPON_TEMPLATES.length)];
+    const code = generateCode(template.namePrefix);
+    const discountValue = randomBetween(template.discountRange[0], template.discountRange[1]);
+    const minOrderAmount = randomBetween(template.minOrderRange[0], template.minOrderRange[1]);
+    const maxDiscountAmount = template.maxDiscountRange
+      ? randomBetween(template.maxDiscountRange[0], template.maxDiscountRange[1])
+      : undefined;
+    const usageLimit = randomBetween(20, 100);
 
-    for (const template of COUPON_TEMPLATES) {
-      const code = generateCode(template.namePrefix);
-      const discountValue = randomBetween(template.discountRange[0], template.discountRange[1]);
-      const minOrderAmount = randomBetween(template.minOrderRange[0], template.minOrderRange[1]);
-      const maxDiscountAmount = template.maxDiscountRange
-        ? randomBetween(template.maxDiscountRange[0], template.maxDiscountRange[1])
-        : undefined;
-      const usageLimit = randomBetween(20, 100);
+    const coupon = await Coupon.create({
+      code,
+      description: template.description,
+      discountType: template.discountType,
+      discountValue,
+      minOrderAmount,
+      maxDiscountAmount,
+      usageLimit,
+      startDate: now,
+      endDate: oneWeekLater,
+      isActive: true,
+    });
 
-      const coupon = await Coupon.create({
-        code,
-        description: template.description,
-        discountType: template.discountType,
-        discountValue,
-        minOrderAmount,
-        maxDiscountAmount,
-        usageLimit,
-        startDate: now,
-        endDate: oneWeekLater,
-        isActive: true,
-      });
-
-      generated.push(coupon.code);
-      console.log(`[Coupon Generator] Created: ${coupon.code} — ${template.discountType} ${discountValue}`);
-    }
-
-    console.log(`[Coupon Generator] Generated ${generated.length} coupons: ${generated.join(', ')}`);
+    console.log(`[Coupon Generator] Created: ${coupon.code} — ${template.discountType} ${discountValue}`);
   } catch (err) {
     console.error('[Coupon Generator] Error:', err.message);
   }

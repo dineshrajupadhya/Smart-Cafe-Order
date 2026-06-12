@@ -11,6 +11,7 @@ exports.getCoupons = async (req, res, next) => {
 
 exports.createCoupon = async (req, res, next) => {
   try {
+    await Coupon.updateMany({ isActive: true }, { isActive: false });
     const coupon = await Coupon.create(req.body);
     res.status(201).json({ success: true, coupon });
   } catch (err) {
@@ -48,7 +49,7 @@ exports.deleteCoupon = async (req, res, next) => {
 exports.getActiveCoupons = async (req, res, next) => {
   try {
     const now = new Date();
-    const coupons = await Coupon.find({
+    const coupon = await Coupon.findOne({
       isActive: true,
       $and: [
         {
@@ -66,12 +67,10 @@ exports.getActiveCoupons = async (req, res, next) => {
           ]
         }
       ]
-    }).select('code description discountType discountValue minOrderAmount maxDiscountAmount usageLimit usedCount endDate');
+    }).select('code description discountType discountValue minOrderAmount maxDiscountAmount usageLimit usedCount endDate')
+      .sort({ createdAt: -1 });
 
-    const active = coupons.filter(c => {
-      if (c.usageLimit && c.usedCount >= c.usageLimit) return false;
-      return true;
-    });
+    const active = coupon && !(coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) ? [coupon] : [];
 
     res.json({ success: true, coupons: active });
   } catch (err) {

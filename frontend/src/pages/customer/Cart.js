@@ -100,46 +100,48 @@ const Cart = () => {
             Clear Cart
           </button>
 
-          {availableCoupons.length > 0 && (
+          {availableCoupons.length > 0 ? (
             <div className="card p-4 mt-4">
               <div className="flex items-center gap-2 mb-3">
                 <FiTag className="text-primary-500" size={18} />
-                <h3 className="font-semibold text-dark-800">Available Coupons</h3>
+                <h3 className="font-semibold text-dark-800">Available Coupon</h3>
               </div>
-              <div className="space-y-2">
-                {availableCoupons.map(coupon => (
-                  <div
-                    key={coupon._id}
-                    className="flex items-center justify-between p-3 bg-primary-50 rounded-lg border border-dashed border-primary-300 cursor-pointer hover:bg-primary-100 transition-colors"
-                    onClick={() => {
-                      setCouponCode(coupon.code);
-                      toast.success(`Coupon "${coupon.code}" selected — click Apply`);
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="bg-primary-500 text-white text-xs font-bold px-2 py-1 rounded">
-                        {coupon.code}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-dark-800">
-                          {coupon.discountType === 'percentage'
-                            ? `${coupon.discountValue}% OFF`
-                            : `₹${coupon.discountValue} OFF`}
-                          {coupon.maxDiscountAmount ? ` (max ₹${coupon.maxDiscountAmount})` : ''}
-                        </p>
-                        {coupon.description && (
-                          <p className="text-xs text-dark-500">{coupon.description}</p>
-                        )}
-                        <p className="text-xs text-dark-400">
-                          {coupon.minOrderAmount > 0 ? `Min order: ₹${coupon.minOrderAmount}` : 'No minimum order'}
-                          {coupon.endDate ? ` • Expires: ${new Date(coupon.endDate).toLocaleDateString()}` : ''}
-                        </p>
-                      </div>
+              {availableCoupons.map(coupon => (
+                <div
+                  key={coupon._id}
+                  className="flex items-center justify-between p-3 bg-primary-50 rounded-lg border border-dashed border-primary-300 cursor-pointer hover:bg-primary-100 transition-colors"
+                  onClick={() => {
+                    setCouponCode(coupon.code);
+                    toast.success(`Coupon "${coupon.code}" selected — click Apply`);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary-500 text-white text-xs font-bold px-2 py-1 rounded">
+                      {coupon.code}
                     </div>
-                    <FiInfo className="text-primary-400" size={16} />
+                    <div>
+                      <p className="text-sm font-medium text-dark-800">
+                        {coupon.discountType === 'percentage'
+                          ? `${coupon.discountValue}% OFF`
+                          : `₹${coupon.discountValue} OFF`}
+                        {coupon.maxDiscountAmount ? ` (max ₹${coupon.maxDiscountAmount})` : ''}
+                      </p>
+                      {coupon.description && (
+                        <p className="text-xs text-dark-500">{coupon.description}</p>
+                      )}
+                      <p className="text-xs text-dark-400">
+                        {coupon.minOrderAmount > 0 ? `Min order: ₹${coupon.minOrderAmount}` : 'No minimum order'}
+                        {coupon.endDate ? ` • Expires: ${new Date(coupon.endDate).toLocaleDateString()}` : ''}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
+                  <FiInfo className="text-primary-400" size={16} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card p-4 mt-4 text-center">
+              <p className="text-sm text-dark-400">No coupons available right now. Check back next week!</p>
             </div>
           )}
         </div>
