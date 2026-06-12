@@ -7,6 +7,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const { startCouponScheduler } = require('./services/couponGenerator');
 
 dotenv.config();
 
@@ -77,6 +78,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  startCouponScheduler();
 });
 
 module.exports = { app, server, io };
