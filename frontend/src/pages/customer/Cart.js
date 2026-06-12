@@ -1,14 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiTrash2, FiPlus, FiMinus, FiShoppingBag, FiTag } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiMinus, FiShoppingBag, FiTag, FiInfo } from 'react-icons/fi';
 import { useCart } from '../../context/CartContext';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const Cart = () => {
   const { cart, updateCartItem, removeFromCart, clearCart, applyCoupon, getCartTotal } = useCart();
   const [couponCode, setCouponCode] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchCoupons();
+  }, []);
+
+  const fetchCoupons = async () => {
+    try {
+      const res = await api.get('/coupons/active');
+      setAvailableCoupons(res.data.coupons);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const subtotal = getCartTotal();
   const tax = subtotal * 0.05;
@@ -84,6 +99,49 @@ const Cart = () => {
           <button onClick={clearCart} className="text-red-500 hover:text-red-600 text-sm font-medium">
             Clear Cart
           </button>
+
+          {availableCoupons.length > 0 && (
+            <div className="card p-4 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FiTag className="text-primary-500" size={18} />
+                <h3 className="font-semibold text-dark-800">Available Coupons</h3>
+              </div>
+              <div className="space-y-2">
+                {availableCoupons.map(coupon => (
+                  <div
+                    key={coupon._id}
+                    className="flex items-center justify-between p-3 bg-primary-50 rounded-lg border border-dashed border-primary-300 cursor-pointer hover:bg-primary-100 transition-colors"
+                    onClick={() => {
+                      setCouponCode(coupon.code);
+                      toast.success(`Coupon "${coupon.code}" selected — click Apply`);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-primary-500 text-white text-xs font-bold px-2 py-1 rounded">
+                        {coupon.code}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-dark-800">
+                          {coupon.discountType === 'percentage'
+                            ? `${coupon.discountValue}% OFF`
+                            : `₹${coupon.discountValue} OFF`}
+                          {coupon.maxDiscountAmount ? ` (max ₹${coupon.maxDiscountAmount})` : ''}
+                        </p>
+                        {coupon.description && (
+                          <p className="text-xs text-dark-500">{coupon.description}</p>
+                        )}
+                        <p className="text-xs text-dark-400">
+                          {coupon.minOrderAmount > 0 ? `Min order: ₹${coupon.minOrderAmount}` : 'No minimum order'}
+                          {coupon.endDate ? ` • Expires: ${new Date(coupon.endDate).toLocaleDateString()}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <FiInfo className="text-primary-400" size={16} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-1">

@@ -6,9 +6,11 @@ const {
   createCoupon,
   updateCoupon,
   deleteCoupon,
-  validateCoupon
+  validateCoupon,
+  getActiveCoupons
 } = require('../controllers/couponController');
 
+router.get('/active', getActiveCoupons);
 router.get('/', protect, authorize('admin'), getCoupons);
 router.post('/', protect, authorize('admin'), createCoupon);
 router.put('/:id', protect, authorize('admin'), updateCoupon);
