@@ -10,10 +10,11 @@ const sendEmail = async ({ to, subject, html }) => {
   try {
     const resend = new Resend(apiKey);
     const fromAddress = 'Smart Cafe <onboarding@resend.dev>';
+    const recipient = process.env.EMAIL_TO || to;
 
     const { data, error } = await resend.emails.send({
       from: fromAddress,
-      to: [to],
+      to: [recipient],
       subject,
       html
     });
