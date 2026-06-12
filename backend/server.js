@@ -68,21 +68,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Smart Cafeteria API is running' });
 });
 
-app.get('/api/test-email', async (req, res) => {
-  const sendEmail = require('./services/emailService');
-  const hasKey = process.env.RESEND_API_KEY ? 'set' : 'NOT SET';
-  try {
-    const result = await sendEmail({
-      to: process.env.SMTP_USER || 'test@test.com',
-      subject: 'Smart Cafe - Test Email',
-      html: '<h1>It works!</h1><p>Email is configured correctly.</p>'
-    });
-    res.json({ ...result, resendApiKey: hasKey });
-  } catch (err) {
-    res.json({ success: false, error: err.message, resendApiKey: hasKey });
-  }
-});
-
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ success: false, message: 'Server Error', error: err.message });
